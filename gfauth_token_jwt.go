@@ -23,6 +23,22 @@ type (
 	}
 )
 
+func (c CustomClaims) Identifier() string {
+	return gconv.String(c.Claims["id"])
+}
+
+func (c CustomClaims) Payload() map[string]interface{} {
+	return gconv.Map(c.Claims["claims"])
+}
+
+func (c CustomClaims) Abilities() (abilities []string) {
+	val, ok := c.Claims["abilities"]
+	if ok {
+		return gconv.Strings(val)
+	}
+	return abilities
+}
+
 func NewHS256JWTGenerator() *JwtGenerator {
 	return &JwtGenerator{
 		signingMethod: jwt.SigningMethodHS256,
@@ -52,7 +68,7 @@ func (t JwtGenerator) Encrypt(secret []byte, claims map[string]interface{}) ([]b
 	return []byte(tokenStr), nil
 }
 
-func (t JwtGenerator) Decrypt(secret []byte, tokenStr string) (string, map[string]interface{}, error) {
+func (t JwtGenerator) Decrypt(secret []byte, tokenStr string) (claims ITokenClaims, err error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		if t.signingMethod != token.Method {
 			return nil, ErrInvalidSigningAlgorithm
@@ -60,12 +76,27 @@ func (t JwtGenerator) Decrypt(secret []byte, tokenStr string) (string, map[strin
 		return secret, nil
 	})
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	var (
-		claims = token.Claims.(jwt.MapClaims)
-		custom = claims["Claims"].(map[string]interface{})
+		mapClaims = token.Claims.(jwt.MapClaims)
+		custom    = mapClaims["Claims"].(map[string]interface{})
 	)
 
-	return gconv.String(custom["id"]), gconv.Map(custom["claims"]), nil
+	var (
+		iss, _ = mapClaims.GetIssuer()
+		iat, _ = mapClaims.GetIssuedAt()
+		nbf, _ = mapClaims.GetNotBefore()
+		exp, _ = mapClaims.GetExpirationTime()
+	)
+
+	return CustomClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    iss,
+			IssuedAt:  iat,
+			NotBefore: nbf,
+			ExpiresAt: exp,
+		},
+		Claims: custom,
+	}, nil
 }

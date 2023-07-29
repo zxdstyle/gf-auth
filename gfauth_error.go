@@ -10,4 +10,6 @@ var (
 	ErrMissingToken = errors.New("token is required")
 
 	ErrInvalidSigningAlgorithm = errors.New("invalid signing algorithm")
+
+	ErrForbiddenAbility = errors.New("forbidden")
 )
